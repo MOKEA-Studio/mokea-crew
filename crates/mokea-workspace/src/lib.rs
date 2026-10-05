@@ -37,6 +37,8 @@ pub async fn discover(start: &Path) -> Result<ProjectContext> {
 }
 
 pub fn require_git(project: &ProjectContext) -> Result<()> {
-    if !project.is_git { bail!("This command needs a Git repository. Run it from inside a repository."); }
+    if !project.is_git {
+        bail!("This command needs a Git repository. Run it from inside a repository.");
+    }
     Ok(())
 }

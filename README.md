@@ -6,16 +6,15 @@
 
 ## Quick start
 
-Install Rust, Git, and at least one supported agent CLI, then run from a project:
+Install Rust, Git, and at least one supported agent CLI. Install MOKEA once:
 
 ```sh
-cargo run -p mokea-cli -- doctor
-cargo run -p mokea-cli -- agents list
-cargo run -p mokea-cli -- run --agent codex "Explain this project and suggest one improvement"
-cargo run -p mokea-cli -- --json doctor
+cargo install --path crates/mokea-cli
 ```
 
-Choose `--agent claude` to use Claude Code. The process adapter reuses each CLI's own installation, credentials, and permission behavior. MOKEA does not copy or store provider credentials.
+Then launch the animated local home screen with `mokea`. It scans installed agent CLIs, shows their sign-in status, and lets you open Codex or Claude Code. Use `mokea setup` to go straight to provider sign-in. For local development, the commands can also be run with `cargo run -p mokea-cli -- <command>`.
+
+The process adapter reuses each CLI's own installation, credentials, and permission behavior. MOKEA does not copy or store provider credentials.
 
 ## Commands
 
@@ -23,8 +22,10 @@ Choose `--agent claude` to use Claude Code. The process adapter reuses each CLI'
 mokea doctor
 mokea agents list
 mokea run --agent <codex|claude> <prompt> [--dir <path>]
+mokea                             # animated home and agent chooser
+mokea setup                       # provider sign-in and first-run setup
 mokea runs <list|show|cancel>    # scaffolded; local history is not wired up yet
-mokea ui                         # planned TUI entry point
+mokea ui                         # open the interactive home/setup screen
 ```
 
 `--agent all` is intentionally gated until each agent gets its own Git worktree. A single-agent run uses the selected project directory directly; inspect its changes with `git diff` when the agent finishes.
