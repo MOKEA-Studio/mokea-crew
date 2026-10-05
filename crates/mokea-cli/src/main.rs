@@ -1,3 +1,5 @@
+mod chat;
+mod config;
 mod onboarding;
 
 use anyhow::{Result, bail};
@@ -124,6 +126,7 @@ async fn doctor(as_json: bool) -> Result<()> {
 }
 
 async fn agents_list(as_json: bool) -> Result<()> {
+    let config = config::AppConfig::load()?;
     let mut agents = Vec::new();
     for adapter in adapters() {
         agents.push(adapter.inspect().await);
@@ -131,7 +134,12 @@ async fn agents_list(as_json: bool) -> Result<()> {
     if as_json {
         println!(
             "{}",
-            serde_json::to_string_pretty(&agents.iter().map(agent_json).collect::<Vec<_>>())?
+            serde_json::to_string_pretty(
+                &agents
+                    .iter()
+                    .map(|agent| agent_json(agent, &config))
+                    .collect::<Vec<_>>(),
+            )?
         );
     } else {
         println!("\n  \x1b[1mAVAILABLE AGENTS\x1b[0m\n");
@@ -147,7 +155,9 @@ async fn agents_list(as_json: bool) -> Result<()> {
                     format!("not found · {}", agent.executable),
                 )
             };
-            println!("  {icon}  {:<16} {state}", agent.kind.display_name());
+            let settings = config.agent(agent.kind);
+            let enabled = if settings.enabled { "on" } else { "off" };
+            println!("  {icon}  @{} ({enabled})  {state}", settings.name);
         }
         println!();
     }
@@ -160,6 +170,18 @@ async fn run(agent: AgentArg, prompt: &str, dir: Option<PathBuf>, as_json: bool)
             "`--agent all` is not available until separate Git worktrees are implemented. Run one agent at a time to keep edits isolated."
         );
     }
+    let kind = match agent {
+        AgentArg::Codex => mokea_core::AgentKind::Codex,
+        AgentArg::Claude => mokea_core::AgentKind::Claude,
+        AgentArg::All => unreachable!(),
+    };
+    let config = config::AppConfig::load()?;
+    if !config.agent(kind).enabled {
+        bail!(
+            "@{} is turned off. Enable it with `mokea setup` or from the /agents screen.",
+            config.agent(kind).name
+        );
+    }
     let project = dir.unwrap_or(std::env::current_dir()?);
     let project = mokea_workspace::discover(&project).await?;
     if project.has_uncommitted_changes && !as_json {
@@ -167,10 +189,9 @@ async fn run(agent: AgentArg, prompt: &str, dir: Option<PathBuf>, as_json: bool)
             "\x1b[33m!\x1b[0m This project has uncommitted changes. MOKEA will leave them untouched."
         );
     }
-    let adapter: Box<dyn AgentAdapter> = match agent {
-        AgentArg::Codex => Box::new(CodexAdapter::new("codex")),
-        AgentArg::Claude => Box::new(ClaudeAdapter::new("claude")),
-        AgentArg::All => unreachable!(),
+    let adapter: Box<dyn AgentAdapter> = match kind {
+        mokea_core::AgentKind::Codex => Box::new(CodexAdapter::new("codex")),
+        mokea_core::AgentKind::Claude => Box::new(ClaudeAdapter::new("claude")),
     };
     if as_json {
         println!(
@@ -252,6 +273,7 @@ fn checks_json(checks: &[(String, bool, String)]) -> serde_json::Value {
     json!({"checks": checks.iter().map(|(name, ok, detail)| json!({"name":name,"ok":ok,"detail":detail})).collect::<Vec<_>>()})
 }
 
-fn agent_json(agent: &AgentInfo) -> serde_json::Value {
-    json!({"id":agent.kind.name(),"name":agent.kind.display_name(),"installed":agent.installed,"executable":agent.executable,"version":agent.version})
+fn agent_json(agent: &AgentInfo, config: &config::AppConfig) -> serde_json::Value {
+    let settings = config.agent(agent.kind);
+    json!({"id":agent.kind.name(),"name":agent.kind.display_name(),"alias":settings.name,"enabled":settings.enabled,"installed":agent.installed,"executable":agent.executable,"version":agent.version})
 }
